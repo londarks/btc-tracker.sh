@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BTC Terminal - Bitcoin Price Tracker</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace;
+            background: #1e1f29;
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .terminal-window {
+            max-width: 1400px;
+            width: 100%;
+            background: #282a36;
+            border-radius: 8px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+            overflow: hidden;
+        }
+
+        .terminal-titlebar {
+            background: #21222c;
+            padding: 12px 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border-bottom: 1px solid #191a21;
+        }
+
+        .terminal-button {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .btn-close { background: #ff5555; }
+        .btn-minimize { background: #f1fa8c; }
+        .btn-maximize { background: #50fa7b; }
+
+        .terminal-title {
+            color: #f8f8f2;
+            font-size: 0.85rem;
+            margin-left: 10px;
+            opacity: 0.8;
+        }
+
+        .terminal-body {
+            background: #282a36;
+            color: #f8f8f2;
+            padding: 20px;
+            min-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .prompt {
+            color: #50fa7b;
+            margin-right: 8px;
+        }
+
+        .command-line {
+            margin-bottom: 15px;
+            line-height: 1.6;
+        }
+
+        .command {
+            color: #8be9fd;
+        }
+
+        .output {
+            margin-left: 0;
+            margin-bottom: 20px;
+        }
+
+        .cursor-blink {
+            display: inline-block;
+            width: 8px;
+            height: 16px;
+            background: #f8f8f2;
+            animation: blink 1s step-end infinite;
+            margin-left: 2px;
+            vertical-align: text-bottom;
+        }
+
+        @keyframes blink {
+            50% { opacity: 0; }
+        }
+
+        .header-section {
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #44475a;
+        }
+
+        .ascii-art {
+            color: #bd93f9;
+            font-size: 0.7rem;
+            line-height: 1.2;
+            margin-bottom: 15px;
+            white-space: pre;
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .control-group {
+            display: flex;
+            gap: 8px;
+        }
+
+        .control-label {
+            color: #6272a4;
+            margin-right: 5px;
+        }
+
+        .btn {
+            background: #44475a;
+            color: #f8f8f2;
+            border: 1px solid #6272a4;
+            padding: 5px 12px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 0.85rem;
+            transition: all 0.2s;
+            border-radius: 3px;
+        }
+
+        .btn:hover {
+            background: #6272a4;
+            border-color: #8be9fd;
+        }
+
+        .btn.active {
+            background: #bd93f9;
+            border-color: #bd93f9;
+            color: #282a36;
+            font-weight: bold;
+        }
+
+        .stats-output {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        .stat-block {
+            background: #1e1f29;
+            border: 1px solid #44475a;
+            border-left: 3px solid #bd93f9;
+            padding: 15px;
+            border-radius: 4px;
+        }
+
+        .stat-label {
+            color: #6272a4;
+            font-size: 0.85rem;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+        }
+
+        .stat-value {
+            color: #f8f8f2;
+            font-size: 1.8rem;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .stat-value.cyan { color: #8be9fd; }
+        .stat-value.green { color: #50fa7b; }
+        .stat-value.pink { color: #ff79c6; }
+        .stat-value.purple { color: #bd93f9; }
+
+        .stat-change {
+            font-size: 0.9rem;
+        }
+
+        .positive { color: #50fa7b; }
+        .negative { color: #ff5555; }
+
+        .chart-section {
+            background: #1e1f29;
+            border: 1px solid #44475a;
+            border-radius: 4px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .section-header {
+            color: #ff79c6;
+            font-size: 1rem;
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .loading-text {
+            color: #f1fa8c;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        .error-text {
+            color: #ff5555;
+            background: rgba(255, 85, 85, 0.1);
+            padding: 10px;
+            border-radius: 4px;
+            border-left: 3px solid #ff5555;
+        }
+
+        .info-text {
+            color: #8be9fd;
+        }
+
+        .success-text {
+            color: #50fa7b;
+        }
+
+        .warning-text {
+            color: #ffb86c;
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+
+            .terminal-body {
+                padding: 15px;
+                min-height: auto;
+            }
+
+            .stats-output {
+                grid-template-columns: 1fr;
+            }
+
+            .controls {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .ascii-art {
+                font-size: 0.5rem;
+            }
+        }
+
+        /* Scrollbar Dracula Style */
+        .terminal-body::-webkit-scrollbar {
+            width: 10px;
+        }
+
+        .terminal-body::-webkit-scrollbar-track {
+            background: #21222c;
+        }
+
+        .terminal-body::-webkit-scrollbar-thumb {
+            background: #44475a;
+            border-radius: 5px;
+        }
+
+        .terminal-body::-webkit-scrollbar-thumb:hover {
+            background: #6272a4;
+        }
+    </style>
+</head>
+<body>
+    <div class="terminal-window">
+        <div class="terminal-titlebar">
+            <span class="terminal-button btn-close"></span>
+            <span class="terminal-button btn-minimize"></span>
+            <span class="terminal-button btn-maximize"></span>
+            <span class="terminal-title">btc-tracker.sh — bash — 120×40</span>
+        </div>
+
+        <div class="terminal-body">
+            <div class="command-line">
+                <span class="prompt">$</span>
+                <span class="command">./btc-tracker.sh --monitor</span>
+            </div>
+
+            <div class="output">
+                <div class="ascii-art">
+    ██████╗ ████████╗ ██████╗    ████████╗██████╗  █████╗  ██████╗██╗  ██╗███████╗██████╗
+    ██╔══██╗╚══██╔══╝██╔════╝    ╚══██╔══╝██╔══██╗██╔══██╗██╔════╝██║ ██╔╝██╔════╝██╔══██╗
+    ██████╔╝   ██║   ██║            ██║   ██████╔╝███████║██║     █████╔╝ █████╗  ██████╔╝
+    ██╔══██╗   ██║   ██║            ██║   ██╔══██╗██╔══██║██║     ██╔═██╗ ██╔══╝  ██╔══██╗
+    ██████╔╝   ██║   ╚██████╗       ██║   ██║  ██║██║  ██║╚██████╗██║  ██╗███████╗██║  ██║
+    ╚═════╝    ╚═╝    ╚═════╝       ╚═╝   ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝
+                </div>
+
+                <div class="command-line">
+                    <span class="success-text">[✓]</span> Connecting to CoinGecko API...
+                </div>
+                <div class="command-line">
+                    <span class="success-text">[✓]</span> Initializing price monitor...
+                </div>
+                <div class="command-line">
+                    <span class="info-text">[i]</span> Auto-refresh: 30s
+                </div>
+            </div>
+
+            <div class="header-section">
+                <div class="controls">
+                    <div class="control-group">
+                        <span class="control-label">CURRENCY:</span>
+                        <button class="btn active currency-btn" data-currency="brl">BRL</button>
+                        <button class="btn currency-btn" data-currency="usd">USD</button>
+                    </div>
+                    <div class="control-group">
+                        <span class="control-label">RANGE:</span>
+                        <button class="btn range-btn" data-days="1">24H</button>
+                        <button class="btn range-btn" data-days="7">7D</button>
+                        <button class="btn active range-btn" data-days="30">30D</button>
+                        <button class="btn range-btn" data-days="90">90D</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="command-line">
+                <span class="prompt">$</span>
+                <span class="command">cat /var/log/btc/current_stats.log</span>
+            </div>
+
+            <div class="output">
+                <div class="stats-output" id="statsGrid">
+                    <div class="loading-text">Loading data...</div>
+                </div>
+            </div>
+
+            <div class="command-line">
+                <span class="prompt">$</span>
+                <span class="command">tail -f /var/log/btc/price_chart.log</span>
+            </div>
+
+            <div class="output">
+                <div class="chart-section">
+                    <div class="section-header">
+                        <span>📊 PRICE HISTORY</span>
+                    </div>
+                    <canvas id="priceChart"></canvas>
+                </div>
+            </div>
+
+            <div class="command-line">
+                <span class="prompt">$</span>
+                <span class="cursor-blink"></span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let chart = null;
+        let currentCurrency = 'brl';
+        let currentDays = 30;
+
+        const currencySymbols = {
+            'brl': 'R$',
+            'usd': '$'
+        };
+
+        // Format number with currency
+        function formatCurrency(value, currency) {
+            return new Intl.NumberFormat('pt-BR', {
+                style: 'currency',
+                currency: currency.toUpperCase()
+            }).format(value);
+        }
+
+        // Format large numbers
+        function formatNumber(value) {
+            if (value >= 1e9) return (value / 1e9).toFixed(2) + 'B';
+            if (value >= 1e6) return (value / 1e6).toFixed(2) + 'M';
+            if (value >= 1e3) return (value / 1e3).toFixed(2) + 'K';
+            return value.toFixed(2);
+        }
+
+        // Fetch current Bitcoin data
+        async function fetchBitcoinData() {
+            try {
+                const response = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=${currentCurrency}&include_24hr_change=true&include_24hr_vol=true&include_market_cap=true`);
+                const data = await response.json();
+                return data.bitcoin;
+            } catch (error) {
+                console.error('Error fetching Bitcoin data:', error);
+                throw error;
+            }
+        }
+
+        // Fetch historical data for chart
+        async function fetchHistoricalData(days) {
+            try {
+                const response = await fetch(`https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=${currentCurrency}&days=${days}`);
+                const data = await response.json();
+                return data.prices;
+            } catch (error) {
+                console.error('Error fetching historical data:', error);
+                throw error;
+            }
+        }
+
+        // Update stats cards
+        async function updateStats() {
+            try {
+                const data = await fetchBitcoinData();
+                const changeKey = `${currentCurrency}_24h_change`;
+                const volKey = `${currentCurrency}_24h_vol`;
+                const mcapKey = `${currentCurrency}_market_cap`;
+
+                const change24h = data[changeKey] || 0;
+                const changeClass = change24h >= 0 ? 'positive' : 'negative';
+                const changeSymbol = change24h >= 0 ? '▲' : '▼';
+
+                const statsHTML = `
+                    <div class="stat-block">
+                        <div class="stat-label">Current Price</div>
+                        <div class="stat-value cyan">${formatCurrency(data[currentCurrency], currentCurrency)}</div>
+                        <div class="stat-change ${changeClass}">
+                            ${changeSymbol} ${Math.abs(change24h).toFixed(2)}% (24h)
+                        </div>
+                    </div>
+                    <div class="stat-block">
+                        <div class="stat-label">24h Volume</div>
+                        <div class="stat-value pink">${currencySymbols[currentCurrency]} ${formatNumber(data[volKey] || 0)}</div>
+                    </div>
+                    <div class="stat-block">
+                        <div class="stat-label">Market Cap</div>
+                        <div class="stat-value purple">${currencySymbols[currentCurrency]} ${formatNumber(data[mcapKey] || 0)}</div>
+                    </div>
+                `;
+
+                document.getElementById('statsGrid').innerHTML = statsHTML;
+            } catch (error) {
+                document.getElementById('statsGrid').innerHTML = `
+                    <div class="error-text">
+                        [ERROR] Failed to fetch data. Please try again later.
+                    </div>
+                `;
+            }
+        }
+
+        // Update chart
+        async function updateChart(days) {
+            try {
+                const prices = await fetchHistoricalData(days);
+
+                const labels = prices.map(p => {
+                    const date = new Date(p[0]);
+                    if (days === 1) {
+                        return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                    }
+                    return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+                });
+
+                const values = prices.map(p => p[1]);
+
+                if (chart) {
+                    chart.destroy();
+                }
+
+                const ctx = document.getElementById('priceChart').getContext('2d');
+
+                chart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Bitcoin Price',
+                            data: values,
+                            borderColor: '#bd93f9',
+                            backgroundColor: 'rgba(189, 147, 249, 0.1)',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.4,
+                            pointRadius: 0,
+                            pointHoverRadius: 6,
+                            pointHoverBackgroundColor: '#ff79c6',
+                            pointHoverBorderColor: '#f8f8f2',
+                            pointHoverBorderWidth: 2
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        aspectRatio: 2.5,
+                        plugins: {
+                            legend: {
+                                display: false
+                            },
+                            tooltip: {
+                                mode: 'index',
+                                intersect: false,
+                                backgroundColor: '#21222c',
+                                titleColor: '#f8f8f2',
+                                bodyColor: '#8be9fd',
+                                borderColor: '#6272a4',
+                                borderWidth: 1,
+                                padding: 12,
+                                displayColors: false,
+                                titleFont: {
+                                    family: "'Fira Code', 'Consolas', monospace",
+                                    size: 13
+                                },
+                                bodyFont: {
+                                    family: "'Fira Code', 'Consolas', monospace",
+                                    size: 14,
+                                    weight: 'bold'
+                                },
+                                callbacks: {
+                                    label: function(context) {
+                                        return formatCurrency(context.parsed.y, currentCurrency);
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                grid: {
+                                    color: '#44475a',
+                                    drawBorder: false
+                                },
+                                ticks: {
+                                    color: '#f8f8f2',
+                                    font: {
+                                        family: "'Fira Code', 'Consolas', monospace",
+                                        size: 11
+                                    },
+                                    maxRotation: 45,
+                                    minRotation: 45
+                                }
+                            },
+                            y: {
+                                grid: {
+                                    color: '#44475a',
+                                    drawBorder: false
+                                },
+                                ticks: {
+                                    color: '#f8f8f2',
+                                    font: {
+                                        family: "'Fira Code', 'Consolas', monospace",
+                                        size: 11
+                                    },
+                                    callback: function(value) {
+                                        return currencySymbols[currentCurrency] + ' ' + formatNumber(value);
+                                    }
+                                }
+                            }
+                        },
+                        interaction: {
+                            mode: 'nearest',
+                            axis: 'x',
+                            intersect: false
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error('Error updating chart:', error);
+            }
+        }
+
+        // Currency toggle
+        document.querySelectorAll('.currency-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                document.querySelectorAll('.currency-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentCurrency = btn.dataset.currency;
+
+                document.getElementById('statsGrid').innerHTML = '<div class="loading-text">[...] Updating data...</div>';
+
+                await updateStats();
+                await updateChart(currentDays);
+            });
+        });
+
+        // Time range toggle
+        document.querySelectorAll('.range-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentDays = parseInt(btn.dataset.days);
+                await updateChart(currentDays);
+            });
+        });
+
+        // Initial load
+        async function init() {
+            await updateStats();
+            await updateChart(currentDays);
+
+            // Update stats every 30 seconds
+            setInterval(updateStats, 30000);
+        }
+
+        init();
+    </script>
+</body>
+</html>
